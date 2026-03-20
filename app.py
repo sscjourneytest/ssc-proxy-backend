@@ -6,24 +6,37 @@ from playwright.sync_api import sync_playwright
 app = Flask(__name__)
 CORS(app)
 
-def fetch_with_fallback(url):
+def fetch_source_cleaned(url):
+    # FIX: Logic to handle URL typos like http// or missing colons
+    if url.startswith("http") and "//" in url and ":" not in url.split("//")[0]:
+        url = url.replace("http//", "http://").replace("https//", "https://")
+    
     with sync_playwright() as p:
-        # Launch a real browser in the background
-        browser = p.chromium.launch(headless=True)
+        # Launch browser with arguments to make it run better on Railway/Cloud
+        browser = p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-setuid-sandbox"])
+        
         context = browser.new_context(
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
         )
         page = context.new_page()
         
         try:
-            # wait_until="networkidle" makes the backend wait for all images to finish loading
-            page.goto(url, wait_until="networkidle", timeout=60000)
+            # wait_until="networkidle" waits for all images and scripts to load
+            # timeout is 60 seconds to ensure slow SSC servers respond
+            response = page.goto(url, wait_until="networkidle", timeout=60000)
+            
+            # Check if the page actually exists
+            if response.status == 404:
+                return "Error: Section not found (404)"
+            
             content = page.content()
             browser.close()
             return content
         except Exception as e:
-            browser.close()
-            return str(e)
+            # Ensure browser closes on failure to prevent Railway memory leaks
+            if 'browser' in locals():
+                browser.close()
+            return f"Error: {str(e)}"
 
 @app.route('/get-source')
 def get_source():
@@ -31,10 +44,16 @@ def get_source():
     if not target_url:
         return jsonify({"error": "No URL provided"}), 400
     
-    source_code = fetch_with_fallback(target_url)
+    print(f"Fetching: {target_url}") # Helps you see progress in Railway Logs
     
-    if "Timeout" in source_code or "Error" in source_code:
-        return jsonify({"error": "SSC site is too slow or link is wrong", "details": source_code}), 500
+    source_code = fetch_source_cleaned(target_url)
+    
+    # Check if the result is an error message
+    if source_code.startswith("Error:"):
+        return jsonify({
+            "error": "Failed to fetch from SSC",
+            "details": source_code
+        }), 500
     
     return jsonify({"source": source_code})
 
