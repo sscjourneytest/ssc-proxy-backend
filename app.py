@@ -6,36 +6,37 @@ from playwright.sync_api import sync_playwright
 app = Flask(__name__)
 CORS(app)
 
-def fetch_source(url):
+def fetch_with_fallback(url):
     with sync_playwright() as p:
-        # Launch browser
+        # Launch a real browser in the background
         browser = p.chromium.launch(headless=True)
-        context = browser.new_context(user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
+        context = browser.new_context(
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+        )
         page = context.new_page()
         
         try:
-            # Go to URL and WAIT for the network to be idle (all images/scripts loaded)
+            # wait_until="networkidle" makes the backend wait for all images to finish loading
             page.goto(url, wait_until="networkidle", timeout=60000)
-            
-            # Get the full loaded HTML
             content = page.content()
             browser.close()
             return content
         except Exception as e:
             browser.close()
-            raise e
+            return str(e)
 
 @app.route('/get-source')
 def get_source():
     target_url = request.args.get('url')
     if not target_url:
-        return jsonify({"error": "No URL"}), 400
+        return jsonify({"error": "No URL provided"}), 400
     
-    try:
-        source_code = fetch_source(target_url)
-        return jsonify({"source": source_code})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    source_code = fetch_with_fallback(target_url)
+    
+    if "Timeout" in source_code or "Error" in source_code:
+        return jsonify({"error": "SSC site is too slow or link is wrong", "details": source_code}), 500
+    
+    return jsonify({"source": source_code})
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
