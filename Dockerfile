@@ -1,18 +1,15 @@
-# Updated to match your Playwright library version (1.58.0)
-FROM mcr.microsoft.com/playwright/python:v1.50.0-jammy
+# This version MUST match your error log exactly
+FROM mcr.microsoft.com/playwright/python:v1.58.0-jammy
 
-# Set working directory
 WORKDIR /app
 
-# Copy requirements and install
+# Installing exactly 1.58.0 to prevent version mismatch
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir playwright==1.58.0 flask flask-cors gunicorn
 
-# Copy the rest of your application
 COPY . .
 
-# Expose the port
 EXPOSE 8080
 
-# Start the application
+# The CMD must be the ONLY way the app starts
 CMD ["gunicorn", "--bind", "0.0.0.0:8080", "app:app"]
