@@ -1,18 +1,18 @@
-# Use a pre-built Microsoft image that already has all browser libraries
-FROM mcr.microsoft.com/playwright/python:v1.40.0-jammy
+# Updated to match your Playwright library version (1.58.0)
+FROM mcr.microsoft.com/playwright/python:v1.50.0-jammy
 
-# Set the working directory
+# Set working directory
 WORKDIR /app
 
-# Copy only requirements first to use caching
+# Copy requirements and install
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of your application code
+# Copy the rest of your application
 COPY . .
 
-# Expose port 8080 (Railway's default)
+# Expose the port
 EXPOSE 8080
 
-# Start the application using gunicorn
+# Start the application
 CMD ["gunicorn", "--bind", "0.0.0.0:8080", "app:app"]
