@@ -1,1 +1,1 @@
-web: playwright install chromium && gunicorn app:app
+web: playwright install chromium && playwright install-deps && gunicorn app:app
