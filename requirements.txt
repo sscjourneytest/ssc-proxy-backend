@@ -1,5 +1,0 @@
-flask
-flask-cors
-playwright
-gunicorn
-# version 1.1
